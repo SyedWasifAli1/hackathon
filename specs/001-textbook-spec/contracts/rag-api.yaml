@@ -1,0 +1,399 @@
+openapi: 3.0.0
+info:
+  title: RAG API for Physical AI & Humanoid Robotics Textbook
+  description: API for Retrieval-Augmented Generation chatbot functionality
+  version: 1.0.0
+servers:
+  - url: https://api.textbook-physical-ai.com/v1
+    description: Production server
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /rag/query:
+    post:
+      summary: Submit a query to the RAG system
+      description: Submit a question with optional selected text context for the AI-powered Q&A system
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RAGQueryRequest'
+      responses:
+        '200':
+          description: Successful response with AI-generated answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RAGQueryResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /rag/feedback:
+    post:
+      summary: Submit feedback on a RAG response
+      description: Submit user feedback on the quality of a RAG response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RAGFeedbackRequest'
+      responses:
+        '200':
+          description: Feedback submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new user account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid registration data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User already exists
+
+  /auth/login:
+    post:
+      summary: Login user
+      description: Authenticate user with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid login credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+
+  /personalization/settings:
+    get:
+      summary: Get user personalization settings
+      description: Retrieve the current personalization settings for the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Personalization settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalizationSettings'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update user personalization settings
+      description: Update the personalization settings for the authenticated user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonalizationSettings'
+      responses:
+        '200':
+          description: Personalization settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonalizationSettings'
+        '400':
+          description: Invalid settings data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RAGQueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: The user's question
+          example: "Explain how ROS 2 nodes communicate with each other"
+        selected_text:
+          type: string
+          description: Optional selected text context from the textbook
+          example: "In ROS 2, nodes communicate through topics, services, and actions..."
+        chapter_id:
+          type: string
+          format: uuid
+          description: Optional ID of the chapter where the query originated
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    RAGQueryResponse:
+      type: object
+      required:
+        - response
+        - confidence_score
+        - sources
+      properties:
+        response:
+          type: string
+          description: The AI-generated response to the query
+          example: "ROS 2 nodes communicate through a publish-subscribe model using topics..."
+        confidence_score:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          description: Confidence score of the AI response
+          example: 0.85
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              chapter_id:
+                type: string
+                format: uuid
+                description: ID of the source chapter
+              chapter_title:
+                type: string
+                description: Title of the source chapter
+              relevance_score:
+                type: number
+                format: float
+                minimum: 0
+                maximum: 1
+                description: Relevance of this source to the query
+          description: List of sources used to generate the response
+
+    RAGFeedbackRequest:
+      type: object
+      required:
+        - query_id
+        - rating
+      properties:
+        query_id:
+          type: string
+          format: uuid
+          description: ID of the original query
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: User rating of the response quality
+          example: 4
+        comment:
+          type: string
+          description: Optional comment about the response
+          example: "The explanation was clear but could include more examples"
+
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "student@example.com"
+        password:
+          type: string
+          minLength: 8
+          description: User's password
+          example: "SecurePassword123"
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        preferred_language:
+          type: string
+          enum: [en, ur]
+          description: User's preferred language
+          example: "en"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "student@example.com"
+        password:
+          type: string
+          description: User's password
+          example: "SecurePassword123"
+
+    AuthResponse:
+      type: object
+      required:
+        - token
+        - user
+      properties:
+        token:
+          type: string
+          description: JWT authentication token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    UserProfile:
+      type: object
+      required:
+        - id
+        - email
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique user identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "student@example.com"
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        preferred_language:
+          type: string
+          enum: [en, ur]
+          description: User's preferred language
+          example: "en"
+        personalization_settings:
+          $ref: '#/components/schemas/PersonalizationSettings'
+
+    PersonalizationSettings:
+      type: object
+      properties:
+        preferred_difficulty:
+          type: string
+          enum: [beginner, intermediate, advanced]
+          description: Preferred difficulty level for content
+          example: "intermediate"
+        learning_path:
+          type: string
+          enum: [theoretical, practical, balanced]
+          description: Preferred learning approach
+          example: "balanced"
+        interface_preferences:
+          type: object
+          description: UI/UX preferences
+          properties:
+            high_contrast:
+              type: boolean
+              description: Use high contrast mode
+              example: false
+            font_size:
+              type: string
+              enum: [small, medium, large]
+              description: Preferred font size
+              example: "medium"
+        content_preferences:
+          type: object
+          description: Content type preferences
+          properties:
+            prefer_visual:
+              type: boolean
+              description: Show more visual content
+              example: true
+            prefer_examples:
+              type: boolean
+              description: Show more code examples
+              example: true
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          description: Indicates if the operation was successful
+          example: true
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+          example: "INVALID_INPUT"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The provided query was invalid"

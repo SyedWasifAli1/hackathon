@@ -1,0 +1,5 @@
+better-ai==0.0.7
+python-dotenv==1.0.0
+asyncpg==0.29.0
+sqlalchemy==2.0.23
+pydantic==2.5.0
