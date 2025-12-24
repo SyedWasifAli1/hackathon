@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useColorMode } from '@docusaurus/theme-common';
-import RAGAPIService from '../../services/rag-api';
 
 interface Message {
   id: string;
@@ -18,7 +17,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ contextText = '' }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello! I\'m your AI assistant for the Physical AI & Humanoid Robotics textbook. How can I help you today?',
+      text: 'Hello! I\'m your AI assistant. How can I help you today?',
       sender: 'bot',
       timestamp: new Date(),
     }
@@ -28,7 +27,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ contextText = '' }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { colorMode } = useColorMode();
-  const ragService = new RAGAPIService();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,21 +52,27 @@ const Chatbot: React.FC<ChatbotProps> = ({ contextText = '' }) => {
     setIsLoading(true);
 
     try {
-      // Prepare query data with context if available
-      const queryData = {
-        query_text: inputText,
-        context_text: contextText || undefined,
-        source_type: contextText ? 'textbook_chapter' : undefined,
-        session_id: 'current-session' // In a real app, this would come from auth
-      };
+      // Call the external API
+      const response = await fetch('https://rag-agent-chatbot-production.up.railway.app/ask', {
+          method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: inputText
+        }),
+      });
 
-      // Call the RAG API
-      const response = await ragService.queryRAG(queryData);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
 
       // Add bot response
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: response.response_text || 'I couldn\'t generate a response based on the textbook content.',
+        text: typeof data === 'string' ? data : (data.response || data.answer || 'I couldn\'t generate a response.'),
         sender: 'bot',
         timestamp: new Date(),
       };
@@ -179,7 +183,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ contextText = '' }) => {
                 color: colorMode === 'dark' ? '#f1f5f9' : '#1e293b',
               }}
             >
-              Textbook Assistant
+              AI Assistant
             </h3>
           </div>
 
@@ -257,33 +261,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ contextText = '' }) => {
               borderTop: `1px solid ${colorMode === 'dark' ? '#334155' : '#e2e8f0'}`,
             }}
           >
-            {contextText && (
-              <div
-                style={{
-                  fontSize: '12px',
-                  padding: '8px',
-                  marginBottom: '8px',
-                  backgroundColor: colorMode === 'dark' ? '#334155' : '#dbeafe',
-                  borderRadius: '6px',
-                  color: colorMode === 'dark' ? '#cbd5e1' : '#1e40af',
-                  fontStyle: 'italic',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                }}
-              >
-                Context: {contextText.substring(0, 100)}...
-              </div>
-            )}
             <div style={{ display: 'flex', gap: '8px' }}>
               <textarea
                 ref={inputRef}
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask a question about the textbook..."
+                placeholder="Type your message..."
                 style={{
                   flex: 1,
                   padding: '12px',
